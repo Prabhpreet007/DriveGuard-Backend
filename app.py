@@ -467,7 +467,7 @@ def process_frame(frame_data, thresholds):
                 if ear < thresholds["ear_threshold"]:
                     alert_state["eye_closed_frames"] += 1
                     logger.info(f"😴 Eye closed frames: {alert_state['eye_closed_frames']}")
-                    if alert_state["eye_closed_frames"] >= 30:  # Reduced from 90 to 30 (~1.5 seconds)
+                    if alert_state["eye_closed_frames"] >= 20:  # Reduced from 90 to 30 (~1.5 seconds)
                         alert_detected = True
                         alert_type = "drowsiness"
                         logger.info("🚨 DROWSINESS ALERT TRIGGERED!")
@@ -489,7 +489,7 @@ def process_frame(frame_data, thresholds):
                 if tilt > thresholds["tilt_threshold"] and not alert_detected:
                     alert_state["tilt_frames"] += 1
                     logger.info(f"↔️ Tilt frames: {alert_state['tilt_frames']}")
-                    if alert_state["tilt_frames"] >= 30:  # Reduced from 90 to 30 (~1.5 seconds)
+                    if alert_state["tilt_frames"] >= 20:  # Reduced from 90 to 30 (~1.5 seconds)
                         alert_detected = True
                         alert_type = "tilt"
                         logger.info("🚨 HEAD TILT ALERT TRIGGERED!")
