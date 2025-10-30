@@ -15,4 +15,3 @@ numpy==1.24.3
 scipy==1.11.1
 gunicorn==21.2.0
 pillow==10.0.0
-# mediapipe commented for now - we'll use OpenCV only
