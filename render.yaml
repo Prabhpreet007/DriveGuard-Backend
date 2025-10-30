@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: driver-drowsiness-backend
+    env: python
+    pythonVersion: "3.11"
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
