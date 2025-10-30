@@ -295,29 +295,371 @@
 
 
 
-from flask import Flask, request, jsonify, Response
+# from flask import Flask, request, jsonify, Response
+# from flask_cors import CORS
+# import cv2
+# import mediapipe as mp
+# import numpy as np
+# import math
+# from scipy.spatial import distance
+# import base64
+# import time
+
+# app = Flask(__name__)
+# CORS(app)
+
+# # Initialize MediaPipe Face Mesh
+# mp_face_mesh = mp.solutions.face_mesh
+# face_mesh = mp_face_mesh.FaceMesh(
+#     max_num_faces=1,
+#     refine_landmarks=True,
+#     min_detection_confidence=0.7,
+#     min_tracking_confidence=0.7
+# )
+
+# # Global variables for state management
+# alert_state = {
+#     "alert_active": False,
+#     "alert_type": "",
+#     "eye_closed_frames": 0,
+#     "yawn_frames": 0,
+#     "tilt_frames": 0,
+#     "last_alert_time": 0
+# }
+
+# # Default thresholds
+# DEFAULT_THRESHOLDS = {
+#     "ear_threshold": 0.22,
+#     "mar_threshold": 0.40,
+#     "tilt_threshold": 15
+# }
+
+# def eye_aspect_ratio(eye):
+#     try:
+#         A = distance.euclidean(eye[1], eye[5])
+#         B = distance.euclidean(eye[2], eye[4])
+#         C = distance.euclidean(eye[0], eye[3])
+#         ear = (A + B) / (2.0 * C)
+#         return ear
+#     except:
+#         return 0.5
+
+# def mouth_aspect_ratio(mouth):
+#     try:
+#         A = distance.euclidean(mouth[13], mouth[14])
+#         B = distance.euclidean(mouth[78], mouth[308])
+#         mar = A / B
+#         return mar
+#     except:
+#         return 0.3
+
+# def calculate_tilt(face_landmarks, img_shape):
+#     try:
+#         h, w = img_shape[:2]
+#         forehead = face_landmarks[10]
+#         chin = face_landmarks[152]
+#         dx = chin[0] - forehead[0]
+#         dy = chin[1] - forehead[1]
+#         angle = math.degrees(math.atan2(dy, dx))
+#         tilt = abs(angle - 90) if angle > 90 else abs(90 - angle)
+#         return tilt
+#     except:
+#         return 0.0
+
+# def process_frame(frame_data, thresholds):
+#     global alert_state
+    
+#     # Decode base64 image
+#     img_data = base64.b64decode(frame_data.split(',')[1])
+#     np_arr = np.frombuffer(img_data, np.uint8)
+#     img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    
+#     if img is None:
+#         return None, "Invalid image"
+    
+#     rgb_frame = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+#     results = face_mesh.process(rgb_frame)
+#     h, w = img.shape[:2]
+    
+#     current_time = time.time()
+#     alert_info = {
+#         "alert": False,
+#         "type": "",
+#         "metrics": {},
+#         "frame_data": None
+#     }
+    
+#     if results.multi_face_landmarks:
+#         for face_landmarks in results.multi_face_landmarks:
+#             landmarks = np.array([(lm.x * w, lm.y * h) for lm in face_landmarks.landmark])
+
+#             # Landmark indices
+#             left_eye_idx = [33, 160, 158, 133, 153, 144]
+#             right_eye_idx = [362, 385, 387, 263, 373, 380]
+#             mouth_idx = [13, 14, 78, 308]
+
+#             left_eye = landmarks[left_eye_idx]
+#             right_eye = landmarks[right_eye_idx]
+#             mouth = landmarks[mouth_idx]
+
+#             # Calculate metrics
+#             ear_left = eye_aspect_ratio(left_eye)
+#             ear_right = eye_aspect_ratio(right_eye)
+#             ear = (ear_left + ear_right) / 2.0
+#             mar = mouth_aspect_ratio(mouth)
+#             tilt = calculate_tilt(landmarks, img.shape)
+
+#             # Check alerts
+#             alert_detected = False
+#             alert_type = ""
+            
+#             # Drowsiness detection (eyes closed)
+#             if ear < thresholds["ear_threshold"]:
+#                 alert_state["eye_closed_frames"] += 1
+#                 if alert_state["eye_closed_frames"] >= 90:  # ~3 seconds
+#                     alert_detected = True
+#                     alert_type = "drowsiness"
+#             else:
+#                 alert_state["eye_closed_frames"] = 0
+
+#             # Yawning detection
+#             if mar > thresholds["mar_threshold"] and not alert_detected:
+#                 alert_state["yawn_frames"] += 1
+#                 if alert_state["yawn_frames"] >= 60:  # ~2 seconds
+#                     alert_detected = True
+#                     alert_type = "yawning"
+#             else:
+#                 alert_state["yawn_frames"] = 0
+
+#             # Head tilt detection
+#             if tilt > thresholds["tilt_threshold"] and not alert_detected:
+#                 alert_state["tilt_frames"] += 1
+#                 if alert_state["tilt_frames"] >= 90:  # ~3 seconds
+#                     alert_detected = True
+#                     alert_type = "tilt"
+#             else:
+#                 alert_state["tilt_frames"] = 0
+
+#             # Update alert state
+#             if alert_detected and (current_time - alert_state["last_alert_time"] > 5):
+#                 alert_state["alert_active"] = True
+#                 alert_state["alert_type"] = alert_type
+#                 alert_state["last_alert_time"] = current_time
+#             elif current_time - alert_state["last_alert_time"] > 5:
+#                 alert_state["alert_active"] = False
+
+#             # Prepare response
+#             alert_info = {
+#                 "alert": alert_state["alert_active"],
+#                 "type": alert_state["alert_type"] if alert_state["alert_active"] else "",
+#                 "metrics": {
+#                     "ear": round(ear, 3),
+#                     "mar": round(mar, 3),
+#                     "tilt": round(tilt, 1),
+#                     "eye_frames": alert_state["eye_closed_frames"],
+#                     "yawn_frames": alert_state["yawn_frames"],
+#                     "tilt_frames": alert_state["tilt_frames"]
+#                 },
+#                 "status": "ALERT!" if alert_state["alert_active"] else "NORMAL"
+#             }
+            
+#             # Encode processed image for display
+#             _, buffer = cv2.imencode('.jpg', img)
+#             frame_base64 = base64.b64encode(buffer).decode('utf-8')
+#             alert_info["frame_data"] = f"data:image/jpeg;base64,{frame_base64}"
+            
+#             break
+#     else:
+#         alert_info = {
+#             "alert": False,
+#             "type": "",
+#             "metrics": {
+#                 "ear": 0,
+#                 "mar": 0,
+#                 "tilt": 0,
+#                 "eye_frames": 0,
+#                 "yawn_frames": 0,
+#                 "tilt_frames": 0
+#             },
+#             "status": "NO FACE DETECTED",
+#             "frame_data": None
+#         }
+    
+#     return alert_info, None
+
+# @app.route('/api/health', methods=['GET'])
+# def health_check():
+#     return jsonify({"status": "healthy", "message": "Driver Drowsiness API is running"})
+
+# @app.route('/api/process-frame', methods=['POST'])
+# def process_frame_route():
+#     try:
+#         data = request.json
+#         frame_data = data.get('frame')
+#         thresholds = data.get('thresholds', DEFAULT_THRESHOLDS)
+        
+#         if not frame_data:
+#             return jsonify({"error": "No frame data provided"}), 400
+        
+#         result, error = process_frame(frame_data, thresholds)
+        
+#         if error:
+#             return jsonify({"error": error}), 400
+        
+#         return jsonify(result)
+        
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+# @app.route('/api/reset-alerts', methods=['POST'])
+# def reset_alerts():
+#     global alert_state
+#     alert_state = {
+#         "alert_active": False,
+#         "alert_type": "",
+#         "eye_closed_frames": 0,
+#         "yawn_frames": 0,
+#         "tilt_frames": 0,
+#         "last_alert_time": 0
+#     }
+#     return jsonify({"message": "Alerts reset successfully"})
+
+# if __name__ == '__main__':
+#     app.run(host='0.0.0.0', port=5000, debug=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import cv2
-import mediapipe as mp
 import numpy as np
 import math
 from scipy.spatial import distance
 import base64
 import time
+import logging
+import os
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
 
-# Initialize MediaPipe Face Mesh
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(
-    max_num_faces=1,
-    refine_landmarks=True,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7
-)
+class DrowsinessDetector:
+    def __init__(self):
+        try:
+            # Load OpenCV Haar cascades
+            self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+            self.eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
+            logger.info("✅ OpenCV cascades loaded successfully")
+            self.detector_type = "opencv"
+        except Exception as e:
+            logger.error(f"❌ Cascade loading failed: {e}")
+            raise
 
-# Global variables for state management
+    def detect_face_features(self, gray_frame):
+        """Detect face and eyes using OpenCV"""
+        faces = self.face_cascade.detectMultiScale(gray_frame, 1.3, 5)
+        
+        if len(faces) == 0:
+            return None
+            
+        x, y, w, h = faces[0]
+        
+        # Get face region
+        face_roi = gray_frame[y:y+h, x:x+w]
+        
+        # Detect eyes in the face region
+        eyes = self.eye_cascade.detectMultiScale(face_roi)
+        
+        # Calculate basic metrics
+        eye_states = []
+        for (ex, ey, ew, eh) in eyes:
+            eye_roi = face_roi[ey:ey+eh, ex:ex+ew]
+            # Simple eye open/close detection based on intensity
+            eye_openness = np.mean(eye_roi) / 255.0
+            eye_states.append(eye_openness)
+        
+        # Simulate face landmarks for compatibility
+        landmarks = self._simulate_landmarks(x, y, w, h, len(eyes) > 0)
+        
+        return {
+            'landmarks': landmarks,
+            'face_rect': (x, y, w, h),
+            'eyes_detected': len(eyes),
+            'eye_states': eye_states
+        }
+    
+    def _simulate_landmarks(self, x, y, w, h, eyes_visible):
+        """Simulate face landmarks for calculations"""
+        landmarks = []
+        
+        # Create 68 points like dlib (for compatibility)
+        for i in range(68):
+            if i in [36, 37, 38, 39, 40, 41]:  # Left eye
+                landmarks.append((x + w//4 + (i-36)*5, y + h//3))
+            elif i in [42, 43, 44, 45, 46, 47]:  # Right eye
+                landmarks.append((x + 3*w//4 + (i-42)*5, y + h//3))
+            elif i in [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59]:  # Mouth outer
+                landmarks.append((x + w//2 + (i-54)*3, y + 2*h//3))
+            elif i in [60, 61, 62, 63, 64, 65, 66, 67]:  # Mouth inner
+                landmarks.append((x + w//2 + (i-63)*2, y + 2*h//3 + 10))
+            elif i == 30:  # Nose tip
+                landmarks.append((x + w//2, y + h//2))
+            elif i == 8:   # Chin
+                landmarks.append((x + w//2, y + h))
+            elif i == 27:  # Nose bridge
+                landmarks.append((x + w//2, y + h//3))
+            elif i in [17, 18, 19, 20, 21]:  # Right eyebrow
+                landmarks.append((x + 3*w//4 + (i-17)*5, y + h//4))
+            elif i in [22, 23, 24, 25, 26]:  # Left eyebrow
+                landmarks.append((x + w//4 + (i-22)*5, y + h//4))
+            else:
+                # Fill other points
+                landmarks.append((x + (i % w), y + (i % h)))
+        
+        return landmarks
+
+# Initialize detector
+detector = DrowsinessDetector()
+
+# Global state
 alert_state = {
     "alert_active": False,
     "alert_type": "",
@@ -327,105 +669,146 @@ alert_state = {
     "last_alert_time": 0
 }
 
-# Default thresholds
 DEFAULT_THRESHOLDS = {
-    "ear_threshold": 0.22,
-    "mar_threshold": 0.40,
+    "ear_threshold": 0.25,
+    "mar_threshold": 0.52,
     "tilt_threshold": 15
 }
 
 def eye_aspect_ratio(eye):
+    """Calculate Eye Aspect Ratio"""
     try:
-        A = distance.euclidean(eye[1], eye[5])
-        B = distance.euclidean(eye[2], eye[4])
-        C = distance.euclidean(eye[0], eye[3])
+        if len(eye) < 6:
+            return 0.5
+            
+        # Use dlib-like indices: [36, 37, 38, 39, 40, 41] for left eye
+        A = distance.euclidean(eye[1], eye[5])  # Vertical 1
+        B = distance.euclidean(eye[2], eye[4])  # Vertical 2  
+        C = distance.euclidean(eye[0], eye[3])  # Horizontal
         ear = (A + B) / (2.0 * C)
-        return ear
-    except:
-        return 0.5
-
-def mouth_aspect_ratio(mouth):
-    try:
-        A = distance.euclidean(mouth[13], mouth[14])
-        B = distance.euclidean(mouth[78], mouth[308])
-        mar = A / B
-        return mar
-    except:
+        return max(0.1, min(ear, 0.5))
+    except Exception as e:
+        logger.warning(f"EAR calculation error: {e}")
         return 0.3
 
-def calculate_tilt(face_landmarks, img_shape):
+def mouth_aspect_ratio(mouth):
+    """Calculate Mouth Aspect Ratio"""
     try:
-        h, w = img_shape[:2]
-        forehead = face_landmarks[10]
-        chin = face_landmarks[152]
-        dx = chin[0] - forehead[0]
-        dy = chin[1] - forehead[1]
-        angle = math.degrees(math.atan2(dy, dx))
-        tilt = abs(angle - 90) if angle > 90 else abs(90 - angle)
-        return tilt
-    except:
-        return 0.0
+        if len(mouth) < 12:
+            return 0.3
+            
+        # Use mouth outer points [48, 54, 51, 57] for MAR calculation
+        A = distance.euclidean(mouth[3], mouth[9])   # Vertical 1
+        B = distance.euclidean(mouth[2], mouth[10])  # Vertical 2
+        C = distance.euclidean(mouth[4], mouth[8])   # Vertical 3
+        D = distance.euclidean(mouth[0], mouth[6])   # Horizontal
+        
+        mar = (A + B + C) / (3.0 * D)
+        return max(0.2, min(mar, 1.0))
+    except Exception as e:
+        logger.warning(f"MAR calculation error: {e}")
+        return 0.3
+
+def calculate_tilt(landmarks):
+    """Calculate head tilt angles"""
+    try:
+        if len(landmarks) < 68:
+            return 0, 0
+            
+        # Get key points
+        left_eye = np.mean([landmarks[i] for i in [36, 37, 38, 39, 40, 41]], axis=0)
+        right_eye = np.mean([landmarks[i] for i in [42, 43, 44, 45, 46, 47]], axis=0)
+        nose_tip = landmarks[30]
+        
+        # Calculate horizontal tilt (head sideways)
+        eye_dx = right_eye[0] - left_eye[0]
+        eye_dy = right_eye[1] - left_eye[1]
+        h_angle = math.degrees(math.atan2(eye_dy, eye_dx))
+        
+        # Calculate vertical tilt (head up/down)
+        eyes_mid = (left_eye + right_eye) / 2
+        vertical_dx = nose_tip[0] - eyes_mid[0]
+        vertical_dy = nose_tip[1] - eyes_mid[1]
+        v_angle = math.degrees(math.atan2(vertical_dx, vertical_dy))
+        
+        return abs(h_angle), abs(v_angle)
+    except Exception as e:
+        logger.warning(f"Tilt calculation error: {e}")
+        return 0, 0
 
 def process_frame(frame_data, thresholds):
     global alert_state
     
-    # Decode base64 image
-    img_data = base64.b64decode(frame_data.split(',')[1])
-    np_arr = np.frombuffer(img_data, np.uint8)
-    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-    
-    if img is None:
-        return None, "Invalid image"
-    
-    rgb_frame = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    results = face_mesh.process(rgb_frame)
-    h, w = img.shape[:2]
-    
-    current_time = time.time()
-    alert_info = {
-        "alert": False,
-        "type": "",
-        "metrics": {},
-        "frame_data": None
-    }
-    
-    if results.multi_face_landmarks:
-        for face_landmarks in results.multi_face_landmarks:
-            landmarks = np.array([(lm.x * w, lm.y * h) for lm in face_landmarks.landmark])
-
-            # Landmark indices
-            left_eye_idx = [33, 160, 158, 133, 153, 144]
-            right_eye_idx = [362, 385, 387, 263, 373, 380]
-            mouth_idx = [13, 14, 78, 308]
-
-            left_eye = landmarks[left_eye_idx]
-            right_eye = landmarks[right_eye_idx]
-            mouth = landmarks[mouth_idx]
+    try:
+        # Decode base64 image
+        if ',' in frame_data:
+            frame_data = frame_data.split(',')[1]
+        
+        img_data = base64.b64decode(frame_data)
+        np_arr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return {"error": "Invalid image data"}, "Image decoding failed"
+        
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        h, w = img.shape[:2]
+        
+        current_time = time.time()
+        
+        # Detect face features
+        features = detector.detect_face_features(gray)
+        
+        alert_info = {
+            "alert": False,
+            "type": "",
+            "metrics": {},
+            "status": "NO FACE DETECTED",
+            "detector_type": detector.detector_type,
+            "frame_data": None
+        }
+        
+        if features:
+            landmarks = features['landmarks']
+            face_rect = features['face_rect']
+            
+            # Extract points for calculations
+            left_eye = [landmarks[i] for i in [36, 37, 38, 39, 40, 41]]
+            right_eye = [landmarks[i] for i in [42, 43, 44, 45, 46, 47]]
+            mouth = [landmarks[i] for i in range(48, 68)]  # All mouth points
 
             # Calculate metrics
             ear_left = eye_aspect_ratio(left_eye)
             ear_right = eye_aspect_ratio(right_eye)
             ear = (ear_left + ear_right) / 2.0
             mar = mouth_aspect_ratio(mouth)
-            tilt = calculate_tilt(landmarks, img.shape)
+            h_tilt, v_tilt = calculate_tilt(landmarks)
+            tilt = max(h_tilt, v_tilt)  # Use maximum tilt
 
-            # Check alerts
+            # Adjust metrics based on actual eye detection
+            if features['eyes_detected'] == 0:
+                ear = 0.1  # Eyes closed
+            elif features['eyes_detected'] > 0 and features['eye_states']:
+                avg_eye_state = np.mean(features['eye_states'])
+                ear = max(0.1, avg_eye_state * 0.4)
+
+            # Alert detection logic
             alert_detected = False
             alert_type = ""
             
-            # Drowsiness detection (eyes closed)
+            # Drowsiness detection
             if ear < thresholds["ear_threshold"]:
                 alert_state["eye_closed_frames"] += 1
-                if alert_state["eye_closed_frames"] >= 90:  # ~3 seconds
+                if alert_state["eye_closed_frames"] >= 20:  # ~1 second
                     alert_detected = True
                     alert_type = "drowsiness"
             else:
                 alert_state["eye_closed_frames"] = 0
 
-            # Yawning detection
+            # Yawn detection
             if mar > thresholds["mar_threshold"] and not alert_detected:
                 alert_state["yawn_frames"] += 1
-                if alert_state["yawn_frames"] >= 60:  # ~2 seconds
+                if alert_state["yawn_frames"] >= 15:  # ~0.75 seconds
                     alert_detected = True
                     alert_type = "yawning"
             else:
@@ -434,7 +817,7 @@ def process_frame(frame_data, thresholds):
             # Head tilt detection
             if tilt > thresholds["tilt_threshold"] and not alert_detected:
                 alert_state["tilt_frames"] += 1
-                if alert_state["tilt_frames"] >= 90:  # ~3 seconds
+                if alert_state["tilt_frames"] >= 25:  # ~1.25 seconds
                     alert_detected = True
                     alert_type = "tilt"
             else:
@@ -458,38 +841,59 @@ def process_frame(frame_data, thresholds):
                     "tilt": round(tilt, 1),
                     "eye_frames": alert_state["eye_closed_frames"],
                     "yawn_frames": alert_state["yawn_frames"],
-                    "tilt_frames": alert_state["tilt_frames"]
+                    "tilt_frames": alert_state["tilt_frames"],
+                    "eyes_detected": features['eyes_detected']
                 },
-                "status": "ALERT!" if alert_state["alert_active"] else "NORMAL"
+                "status": "ALERT!" if alert_state["alert_active"] else "NORMAL",
+                "detector_type": detector.detector_type
             }
             
-            # Encode processed image for display
-            _, buffer = cv2.imencode('.jpg', img)
+            # Draw visualization
+            x, y, w, h = face_rect
+            cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            
+            # Draw eyes
+            for eye_idx in [[36, 37, 38, 39, 40, 41], [42, 43, 44, 45, 46, 47]]:
+                eye_points = np.array([landmarks[i] for i in eye_idx], np.int32)
+                cv2.polylines(img, [eye_points], True, (0, 255, 0), 1)
+            
+            # Draw mouth
+            mouth_points = np.array([landmarks[i] for i in range(48, 60)], np.int32)
+            cv2.polylines(img, [mouth_points], True, (0, 165, 255), 1)
+            
+            # Add metrics text
+            cv2.putText(img, f"EAR: {ear:.2f}", (10, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, 
+                       (0, 0, 255) if ear < thresholds["ear_threshold"] else (0, 255, 0), 2)
+            cv2.putText(img, f"MAR: {mar:.2f}", (10, 60), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, 
+                       (0, 0, 255) if mar > thresholds["mar_threshold"] else (0, 255, 0), 2)
+            cv2.putText(img, f"TILT: {tilt:.1f}°", (10, 90), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, 
+                       (0, 0, 255) if tilt > thresholds["tilt_threshold"] else (0, 255, 0), 2)
+            
+            status_color = (0, 0, 255) if alert_info['alert'] else (0, 255, 0)
+            cv2.putText(img, f"Status: {alert_info['status']}", (10, 120), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 2)
+            
+            # Encode processed image
+            _, buffer = cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 80])
             frame_base64 = base64.b64encode(buffer).decode('utf-8')
             alert_info["frame_data"] = f"data:image/jpeg;base64,{frame_base64}"
             
-            break
-    else:
-        alert_info = {
-            "alert": False,
-            "type": "",
-            "metrics": {
-                "ear": 0,
-                "mar": 0,
-                "tilt": 0,
-                "eye_frames": 0,
-                "yawn_frames": 0,
-                "tilt_frames": 0
-            },
-            "status": "NO FACE DETECTED",
-            "frame_data": None
-        }
-    
-    return alert_info, None
+        return alert_info, None
+        
+    except Exception as e:
+        logger.error(f"Frame processing error: {e}")
+        return {"error": str(e)}, "Processing failed"
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    return jsonify({"status": "healthy", "message": "Driver Drowsiness API is running"})
+    return jsonify({
+        "status": "healthy", 
+        "message": "DriveGuard API is running",
+        "detector_type": detector.detector_type
+    })
 
 @app.route('/api/process-frame', methods=['POST'])
 def process_frame_route():
@@ -509,6 +913,7 @@ def process_frame_route():
         return jsonify(result)
         
     except Exception as e:
+        logger.error(f"API error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/reset-alerts', methods=['POST'])
@@ -525,4 +930,5 @@ def reset_alerts():
     return jsonify({"message": "Alerts reset successfully"})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
