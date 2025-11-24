@@ -1,28 +1,19 @@
-
-
-
 # flask==2.3.3
 # flask-cors==4.0.0
 # opencv-python==4.8.1.78
+# mediapipe==0.10.7
 # numpy==1.24.3
 # scipy==1.11.1
 # gunicorn==21.2.0
 # pillow==10.0.0
-
-
-
-
-
-
-
-
+\
 
 
 flask==2.3.3
 flask-cors==4.0.0
-opencv-python==4.8.1.78
-mediapipe==0.10.7
-numpy==1.24.3
-scipy==1.11.1
+opencv-python-headless==4.9.0.80
+mediapipe==0.10.14
+numpy==1.26.4
+scipy==1.11.4
 gunicorn==21.2.0
-pillow==10.0.0
+pillow==10.2.0
